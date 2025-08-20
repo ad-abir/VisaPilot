@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VisaPilot Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="min-h-screen">
+        <!-- Header with Logo -->
+        <header class="pt-8 pb-6">
+            <div class="container mx-auto px-6">
+                <div class="flex items-center justify-center mb-4">
+                    <div class="logo-container rounded-xl p-4 mr-4">
+                        <img src="/static/images/US-Embassy-logo.png" alt="U.S. Embassy Logo" class="w-16 h-16 object-contain">
+                    </div>
+                    <div class="text-center">
+                        <h1 class="text-4xl font-bold header-text mb-2">VisaPilot Dashboard</h1>
+                        <p class="text-blue-100 text-lg font-medium">U.S. Embassy Visa Processing Center</p>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="container mx-auto px-6">
+            <div class="flex justify-center">
+                <div class="glass-card rounded-2xl p-10 w-full max-w-lg">
+                    <!-- Status Header -->
+                    <div class="flex items-center justify-center mb-8">
+                        <div class="status-indicator mr-3"></div>
+                        <h2 class="text-2xl font-semibold text-gray-700">System Active</h2>
+                    </div>
+
+                    <!-- Current Applicant Section -->
+                    <div class="text-center mb-8">
+                        <h3 class="text-xl font-medium text-gray-600 mb-2">Counter Number</h3>
+                        <div id="counter" class="text-6xl font-bold counter-display mb-2">
+                            <div class="loading-spinner mx-auto"></div>
+                        </div>
+                        <p class="text-sm text-gray-500 font-medium tracking-wide">APPLICATION NUMBER</p>
+                    </div>
+
+                    <!-- Visa Officer Section -->
+                    <div class="text-center mb-8">
+                        <div class="mb-4">
+                            <img id="vo-image" src="" alt="Visa Officer" class="w-36 h-36 object-cover rounded-full border-4 border-white officer-image mx-auto">
+                        </div>
+                        <h4 class="text-lg font-semibold text-gray-700 mb-1" id="vo-name">Loading Officer...</h4>
+                        <p class="text-sm text-gray-500 font-medium">CONSULAR OFFICER</p>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="text-center space-x-4">
+                        <button id="start-btn" class="start-btn text-white font-semibold py-3 px-8 rounded-xl transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed">
+                            <span id="start-btn-text">Start Interview</span>
+                            <div id="start-btn-spinner" class="loading-spinner mx-auto hidden"></div>
+                        </button>
+                        <button id="refresh-btn" class="refresh-btn text-white font-semibold py-3 px-8 rounded-xl transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed">
+                            <span id="btn-text">Refresh Status</span>
+                            <div id="btn-spinner" class="loading-spinner mx-auto hidden"></div>
+                        </button>
+                    </div>
+
+                    <!-- Footer Info -->
+                    <div class="mt-8 pt-6 border-t border-gray-200">
+                        <div class="flex justify-between text-sm text-gray-500">
+                            <span>Last Updated:</span>
+                            <span id="last-updated">--:--</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="mt-12 pb-6">
+            <div class="container mx-auto px-6 text-center">
+                <p class="text-blue-100 text-sm">
+                    U.S. Department of State | Consular Affairs
+                </p>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        let isLoading = false;
+        let isInterviewActive = false;
+        let currentIndex = 0;
+        let script = [];
+        let gender = '';
+        let image = null;
+
+        function updateTimestamp() {
+            const now = new Date();
+            document.getElementById('last-updated').textContent = now.toLocaleTimeString();
+        }
+
+        function setLoadingState(buttonId, loading) {
+            isLoading = loading;
+            const btn = document.getElementById(buttonId);
+            const btnText = document.getElementById(buttonId === 'start-btn' ? 'start-btn-text' : 'btn-text');
+            const btnSpinner = document.getElementById(buttonId === 'start-btn' ? 'start-btn-spinner' : 'btn-spinner');
+            
+            if (loading) {
+                btn.disabled = true;
+                btnText.classList.add('hidden');
+                btnSpinner.classList.remove('hidden');
+            } else {
+                btn.disabled = false;
+                btnText.classList.remove('hidden');
+                btnSpinner.classList.add('hidden');
+            }
+        }
+
+        function getVoiceForGender(gender) {
+            const voices = window.speechSynthesis.getVoices();
+            let selectedVoice = null;
+            
+            if (gender === 'female') {
+                // Common female voice names in en-US
+                const femaleVoiceNames = ['Samantha', 'Victoria', 'Allison', 'Susan', 'Karen', 'Zira'];
+                selectedVoice = voices.find(voice => 
+                    voice.lang === 'en-US' && 
+                    femaleVoiceNames.some(name => voice.name.toLowerCase().includes(name.toLowerCase()))
+                );
+            } else {
+                // Fallback for male or any en-US voice
+                selectedVoice = voices.find(voice => 
+                    voice.lang === 'en-US' && !['Samantha', 'Victoria', 'Allison', 'Susan', 'Karen', 'Zira'].some(name => 
+                        voice.name.toLowerCase().includes(name.toLowerCase()))
+                );
+            }
+            
+            // Fallback to any en-US voice if no gender-specific voice found
+            if (!selectedVoice) {
+                selectedVoice = voices.find(voice => voice.lang === 'en-US');
+            }
+            
+            return selectedVoice;
+        }
+
+        function speakNext() {
+            if (currentIndex >= script.length || !isInterviewActive) {
+                console.log('Interview simulation complete or stopped.');
+                isInterviewActive = false;
+                setLoadingState('start-btn', false);
+                return;
+            }
+            const text = script[currentIndex];
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'en-US';
+            utterance.voice = getVoiceForGender(gender);
+            utterance.onstart = () => {
+                image.classList.add('speaking');
+            };
+            utterance.onend = () => {
+                image.classList.remove('speaking');
+                startListening(() => {
+                    currentIndex++;
+                    speakNext();
+                });
+            };
+            window.speechSynthesis.speak(utterance);
+        }
+
+        function startListening(callback) {
+            if (!isInterviewActive) {
+                if (callback) callback();
+                return;
+            }
+            if (!('SpeechRecognition' in window)) {
+                console.log('Speech recognition not supported in this browser.');
+                if (callback) callback();
+                return;
+            }
+            const recognition = new window.SpeechRecognition();
+            recognition.lang = 'en-US';
+            recognition.interimResults = false;
+            recognition.maxAlternatives = 1;
+            recognition.onstart = () => {
+                image.classList.add('listening');
+            };
+            recognition.onend = () => {
+                image.classList.remove('listening');
+                if (callback) callback();
+            };
+            recognition.onresult = (event) => {
+                const transcript = event.results[0][0].transcript;
+                console.log(`User response to "${script[currentIndex - 1]}": ${transcript}`);
+            };
+            recognition.onerror = (event) => {
+                console.error(`Speech recognition error for "${script[currentIndex - 1]}": ${event.error}`);
+                if (event.error === 'no-speech') {
+                    console.log(`No speech detected for "${script[currentIndex - 1]}"`);
+                }
+                if (callback) callback();
+            };
+            recognition.start();
+        }
+
+        async function fetchApplicantData(startInterview = false) {
+            if (isLoading) return;
+            
+            try {
+                setLoadingState('refresh-btn', true);
+                const response = await fetch('/get_applicant');
+                const data = await response.json();
+                
+                // Simulate minimum loading time for better UX
+                await new Promise(resolve => setTimeout(resolve, 800));
+                
+                document.getElementById('counter').textContent = data.counter;
+                document.getElementById('vo-image').src = `/static/images/${data.image}`;
+                document.getElementById('vo-name').textContent = data.name;
+                updateTimestamp();
+
+                // Set up speech data
+                script = [data.script.greeting, ...data.script.questions];
+                gender = data.gender;
+                image = document.getElementById('vo-image');
+                currentIndex = 0;
+                isInterviewActive = startInterview;
+
+                if (startInterview) {
+                    // Wait for voices to load if needed
+                    if (window.speechSynthesis.getVoices().length === 0) {
+                        window.speechSynthesis.onvoiceschanged = () => {
+                            speakNext();
+                        };
+                    } else {
+                        speakNext();
+                    }
+                }
+            } catch (error) {
+                console.error('Error fetching applicant data:', error);
+                document.getElementById('counter').textContent = 'Error';
+                document.getElementById('vo-name').textContent = 'Connection Error';
+            } finally {
+                setLoadingState('refresh-btn', false);
+            }
+        }
+
+        document.getElementById('start-btn').addEventListener('click', () => {
+            if (isInterviewActive) return;
+            setLoadingState('start-btn', true);
+            isInterviewActive = true;
+            // Fetch new data only if no interview is active
+            if (script.length === 0) {
+                fetchApplicantData(true).then(() => {
+                    setLoadingState('start-btn', false);
+                });
+            } else {
+                // Resume with existing data
+                if (window.speechSynthesis.getVoices().length === 0) {
+                    window.speechSynthesis.onvoiceschanged = () => {
+                        speakNext();
+                    };
+                } else {
+                    speakNext();
+                }
+                setLoadingState('start-btn', false);
+            }
+        });
+
+        document.getElementById('refresh-btn').addEventListener('click', () => {
+            // Stop any ongoing speech or listening
+            window.speechSynthesis.cancel();
+            isInterviewActive = false;
+            currentIndex = 0;
+            setLoadingState('start-btn', false);
+            fetchApplicantData(false);
+        });
+
+        window.onload = () => {
+            fetchApplicantData(false); // Load initial data without starting interview
+            updateTimestamp();
+        };
+    </script>
+</body>
+</html>

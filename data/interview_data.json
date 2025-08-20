@@ -1,0 +1,24 @@
+{
+  "greetings": [
+    "Good morning. Welcome to the U.S. Embassy visa interview. Please hand me your passport and DS-160 confirmation.",
+    "Hello. Please step forward and provide your passport and visa application documents.",
+    "Good afternoon. How may I assist you with your visa application today?"
+  ],
+  "questions": [
+    "What is the purpose of your visit to the United States?",
+    "How long do you plan to stay in the United States?",
+    "Do you have any relatives or friends currently in the United States?",
+    "Have you ever visited the United States before?",
+    "Where will you be staying during your time in the United States?",
+    "What is your current occupation or job?",
+    "Who will be paying for your trip to the United States?",
+    "What is your monthly income?",
+    "What ties do you have to your home country that will ensure you return after your visit?",
+    "Have you booked your travel tickets or accommodations yet?",
+    "What is your educational background?",
+    "Are you married? Do you have any children?",
+    "Why do you want to visit this particular location in the United States?",
+    "Do you plan to work or study while in the United States?",
+    "Can you provide details about your travel itinerary?"
+  ]
+}
