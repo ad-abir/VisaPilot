@@ -23,6 +23,10 @@ body {
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    height: 1.2em; /* fixed height equal to one line of text-6xl */
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .officer-image {
@@ -98,12 +102,25 @@ body {
     100% { transform: rotate(360deg); }
 }
 
-#vo-image.speaking {
-    box-shadow: 0 0 20px 10px rgba(0, 255, 0, 0.8); /* Green glow */
+/* #vo-image.speaking {
+    box-shadow: 0 0 20px 10px rgba(0, 255, 0, 0.8);
     transition: box-shadow 0.3s ease;
 }
 
 #vo-image.listening {
-    box-shadow: 0 0 20px 10px rgba(255, 0, 0, 0.8); /* Red glow */
+    box-shadow: 0 0 20px 10px rgba(255, 0, 0, 0.8);
     transition: box-shadow 0.3s ease;
+} */
+
+/* Crisp circular rings */
+#vo-image.speaking {
+    /* Green ring */
+    box-shadow: 0 0 0 4px rgb(44, 255, 44);
+    transition: box-shadow 0.2s ease;
+}
+
+#vo-image.listening {
+    /* Red ring */
+    box-shadow: 0 0 0 4px red;
+    transition: box-shadow 0.2s ease;
 }
