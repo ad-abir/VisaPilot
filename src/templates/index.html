@@ -54,14 +54,14 @@
                     </div>
 
                     <!-- Action Buttons -->
-                    <div class="text-center space-x-4">
-                        <button id="start-btn" class="start-btn text-white font-semibold py-3 px-8 rounded-xl transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed">
+                    <div class="text-center space-x-4 button-container">
+                        <button id="start-btn" class="action-btn start-btn text-white font-semibold rounded-xl disabled:opacity-50 disabled:cursor-not-allowed">
                             <span id="start-btn-text">Start Interview</span>
-                            <div id="start-btn-spinner" class="loading-spinner mx-auto hidden"></div>
+                            <div id="start-btn-spinner" class="loading-spinner hidden"></div>
                         </button>
-                        <button id="refresh-btn" class="refresh-btn text-white font-semibold py-3 px-8 rounded-xl transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed">
-                            <span id="btn-text">Refresh Status</span>
-                            <div id="btn-spinner" class="loading-spinner mx-auto hidden"></div>
+                        <button id="refresh-btn" class="action-btn refresh-btn text-white font-semibold rounded-xl disabled:opacity-50 disabled:cursor-not-allowed">
+                            <span id="refresh-btn-text">Refresh Status</span>
+                            <div id="refresh-btn-spinner" class="loading-spinner hidden"></div>
                         </button>
                     </div>
 
@@ -100,19 +100,24 @@
         }
 
         function setLoadingState(buttonId, loading) {
-            isLoading = loading;
             const btn = document.getElementById(buttonId);
-            const btnText = document.getElementById(buttonId === 'start-btn' ? 'start-btn-text' : 'btn-text');
-            const btnSpinner = document.getElementById(buttonId === 'start-btn' ? 'start-btn-spinner' : 'btn-spinner');
+            const btnText = document.getElementById(`${buttonId}-text`);
+            const btnSpinner = document.getElementById(`${buttonId}-spinner`);
             
             if (loading) {
                 btn.disabled = true;
                 btnText.classList.add('hidden');
                 btnSpinner.classList.remove('hidden');
+                if (buttonId === 'refresh-btn') {
+                    isLoading = true;
+                }
             } else {
                 btn.disabled = false;
                 btnText.classList.remove('hidden');
                 btnSpinner.classList.add('hidden');
+                if (buttonId === 'refresh-btn') {
+                    isLoading = false;
+                }
             }
         }
 
@@ -226,7 +231,6 @@
                 document.getElementById('vo-name').textContent = data.name;
                 updateTimestamp();
 
-
                 // Set up speech data
                 script = [data.script.greeting, ...data.script.questions];
                 gender = data.gender;
@@ -255,8 +259,10 @@
 
         document.getElementById('start-btn').addEventListener('click', () => {
             if (isInterviewActive) return;
+            
             setLoadingState('start-btn', true);
             isInterviewActive = true;
+            
             // Fetch new data only if no interview is active
             if (script.length === 0) {
                 fetchApplicantData(true).then(() => {
@@ -267,11 +273,12 @@
                 if (window.speechSynthesis.getVoices().length === 0) {
                     window.speechSynthesis.onvoiceschanged = () => {
                         speakNext();
+                        setLoadingState('start-btn', false);
                     };
                 } else {
                     speakNext();
+                    setLoadingState('start-btn', false);
                 }
-                setLoadingState('start-btn', false);
             }
         });
 
@@ -293,6 +300,10 @@
         });
 
         window.onload = () => {
+            // Ensure all spinners are initially hidden
+            document.getElementById('start-btn-spinner').classList.add('hidden');
+            document.getElementById('refresh-btn-spinner').classList.add('hidden');
+            
             fetchApplicantData(false); // Load initial data without starting interview
             updateTimestamp();
         };
