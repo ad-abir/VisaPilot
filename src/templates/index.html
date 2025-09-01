@@ -76,7 +76,92 @@
             </div>
         </main>
 
-        <!-- Footer -->
+        <!-- Document Capture Modal -->
+        <div id="document-modal" class="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm hidden z-50 flex items-center justify-center">
+            <div class="document-modal bg-white rounded-2xl p-8 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+                <div class="text-center mb-6">
+                    <h3 class="text-2xl font-bold text-gray-800 mb-2">Document Verification Required</h3>
+                    <p class="text-gray-600">Please upload clear images of your documents for processing</p>
+                </div>
+
+                <!-- Document Upload Sections -->
+                <div class="grid md:grid-cols-2 gap-6 mb-6">
+                    <!-- Passport Upload -->
+                    <div class="document-upload-section">
+                        <h4 class="text-lg font-semibold text-gray-700 mb-3 flex items-center">
+                            <span class="document-icon passport-icon mr-2">📘</span>
+                            Passport (Required)
+                        </h4>
+                        <div id="passport-drop-zone" class="drop-zone border-2 border-dashed border-blue-300 rounded-xl p-6 text-center cursor-pointer hover:border-blue-500 transition-colors">
+                            <div class="upload-content">
+                                <div class="upload-icon mb-3">📄</div>
+                                <p class="text-gray-600 mb-2">Click to upload or drag & drop</p>
+                                <p class="text-sm text-gray-500">JPG, PNG, PDF (Max 10MB)</p>
+                            </div>
+                            <div id="passport-preview" class="hidden">
+                                <img class="preview-image mx-auto rounded-lg mb-2" alt="Passport preview">
+                                <p class="text-sm text-green-600 font-medium">✓ Passport uploaded</p>
+                                <button type="button" class="text-red-500 text-sm mt-2 hover:underline" onclick="removeDocument('passport')">Remove</button>
+                            </div>
+                        </div>
+                        <input type="file" id="passport-input" class="hidden" accept="image/*,.pdf">
+                    </div>
+
+                    <!-- I-20 Upload -->
+                    <div class="document-upload-section">
+                        <h4 class="text-lg font-semibold text-gray-700 mb-3 flex items-center">
+                            <span class="document-icon i20-icon mr-2">📋</span>
+                            I-20 Form (Required)
+                        </h4>
+                        <div id="i20-drop-zone" class="drop-zone border-2 border-dashed border-green-300 rounded-xl p-6 text-center cursor-pointer hover:border-green-500 transition-colors">
+                            <div class="upload-content">
+                                <div class="upload-icon mb-3">📄</div>
+                                <p class="text-gray-600 mb-2">Click to upload or drag & drop</p>
+                                <p class="text-sm text-gray-500">JPG, PNG, PDF (Max 10MB)</p>
+                            </div>
+                            <div id="i20-preview" class="hidden">
+                                <img class="preview-image mx-auto rounded-lg mb-2" alt="I-20 preview">
+                                <p class="text-sm text-green-600 font-medium">✓ I-20 uploaded</p>
+                                <button type="button" class="text-red-500 text-sm mt-2 hover:underline" onclick="removeDocument('i20')">Remove</button>
+                            </div>
+                        </div>
+                        <input type="file" id="i20-input" class="hidden" accept="image/*,.pdf">
+                    </div>
+                </div>
+
+                <!-- Processing Status -->
+                <div id="processing-status" class="hidden mb-6">
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <div class="flex items-center">
+                            <div class="processing-spinner mr-3"></div>
+                            <div>
+                                <p class="text-blue-800 font-medium">Processing Documents...</p>
+                                <p class="text-blue-600 text-sm">Extracting information from uploaded documents</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Extracted Data Display -->
+                <div id="extracted-data" class="hidden mb-6">
+                    <h5 class="text-lg font-semibold text-gray-700 mb-3">Extracted Information</h5>
+                    <div class="bg-gray-50 rounded-lg p-4 space-y-2" id="data-display">
+                        <!-- Data will be populated here -->
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="flex justify-end space-x-4">
+                    <button id="cancel-docs" class="px-6 py-3 border border-gray-300 rounded-xl text-gray-700 hover:bg-gray-50 transition-colors">
+                        Cancel
+                    </button>
+                    <button id="process-docs" class="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                        <span id="process-text">Process Documents</span>
+                        <div id="process-spinner" class="loading-spinner hidden"></div>
+                    </button>
+                </div>
+            </div>
+        </div>
         <footer class="mt-12 pb-6">
             <div class="container mx-auto px-6 text-center">
                 <p class="text-blue-100 text-sm">
@@ -93,6 +178,188 @@
         let script = [];
         let gender = '';
         let image = null;
+        let documentsUploaded = { passport: false, i20: false };
+        let extractedData = {};
+
+        function showDocumentModal() {
+            document.getElementById('document-modal').classList.remove('hidden');
+            document.body.style.overflow = 'hidden'; // Prevent background scrolling
+        }
+
+        function hideDocumentModal() {
+            document.getElementById('document-modal').classList.add('hidden');
+            document.body.style.overflow = 'auto';
+        }
+
+        function setupFileUpload(inputId, dropZoneId, previewId, docType) {
+            const input = document.getElementById(inputId);
+            const dropZone = document.getElementById(dropZoneId);
+            const preview = document.getElementById(previewId);
+
+            // Click to upload
+            dropZone.addEventListener('click', () => input.click());
+
+            // File input change
+            input.addEventListener('change', (e) => {
+                if (e.target.files.length > 0) {
+                    handleFileUpload(e.target.files[0], docType, preview, dropZone);
+                }
+            });
+
+            // Drag and drop
+            dropZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropZone.classList.add('border-blue-500', 'bg-blue-50');
+            });
+
+            dropZone.addEventListener('dragleave', (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('border-blue-500', 'bg-blue-50');
+            });
+
+            dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('border-blue-500', 'bg-blue-50');
+                if (e.dataTransfer.files.length > 0) {
+                    handleFileUpload(e.dataTransfer.files[0], docType, preview, dropZone);
+                }
+            });
+        }
+
+        function handleFileUpload(file, docType, preview, dropZone) {
+            // Validate file
+            if (file.size > 10 * 1024 * 1024) {
+                alert('File size must be less than 10MB');
+                return;
+            }
+
+            const validTypes = ['image/jpeg', 'image/png', 'application/pdf'];
+            if (!validTypes.includes(file.type)) {
+                alert('Please upload JPG, PNG, or PDF files only');
+                return;
+            }
+
+            // Show preview
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                if (file.type.startsWith('image/')) {
+                    preview.querySelector('.preview-image').src = e.target.result;
+                    preview.querySelector('.preview-image').style.display = 'block';
+                } else {
+                    preview.querySelector('.preview-image').style.display = 'none';
+                }
+                
+                dropZone.querySelector('.upload-content').classList.add('hidden');
+                preview.classList.remove('hidden');
+                documentsUploaded[docType] = true;
+                checkDocumentsReady();
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function removeDocument(docType) {
+            const input = document.getElementById(`${docType}-input`);
+            const dropZone = document.getElementById(`${docType}-drop-zone`);
+            const preview = document.getElementById(`${docType}-preview`);
+
+            input.value = '';
+            dropZone.querySelector('.upload-content').classList.remove('hidden');
+            preview.classList.add('hidden');
+            documentsUploaded[docType] = false;
+            checkDocumentsReady();
+        }
+
+        function checkDocumentsReady() {
+            const processBtn = document.getElementById('process-docs');
+            const allUploaded = documentsUploaded.passport && documentsUploaded.i20;
+            processBtn.disabled = !allUploaded;
+        }
+
+        async function processDocuments() {
+            const processBtn = document.getElementById('process-docs');
+            const processText = document.getElementById('process-text');
+            const processSpinner = document.getElementById('process-spinner');
+            const statusDiv = document.getElementById('processing-status');
+
+            // Show processing state
+            processBtn.disabled = true;
+            processText.classList.add('hidden');
+            processSpinner.classList.remove('hidden');
+            statusDiv.classList.remove('hidden');
+
+            try {
+                // Simulate document processing (replace with actual API call)
+                await new Promise(resolve => setTimeout(resolve, 3000));
+
+                // Simulate extracted data (replace with actual extraction results)
+                extractedData = {
+                    passport: {
+                        fullName: "John Doe",
+                        passportNumber: "123456789",
+                        nationality: "United States",
+                        dateOfBirth: "1990-05-15",
+                        expiryDate: "2030-05-15"
+                    },
+                    i20: {
+                        sevisId: "N0012345678",
+                        schoolName: "University of Technology",
+                        programOfStudy: "Computer Science",
+                        academicLevel: "Bachelor's Degree",
+                        startDate: "2024-08-15"
+                    }
+                };
+
+                displayExtractedData();
+                statusDiv.classList.add('hidden');
+                
+                // Auto-close modal after 3 seconds and continue interview
+                setTimeout(() => {
+                    hideDocumentModal();
+                    continueInterview();
+                }, 3000);
+
+            } catch (error) {
+                console.error('Error processing documents:', error);
+                alert('Error processing documents. Please try again.');
+            } finally {
+                processBtn.disabled = false;
+                processText.classList.remove('hidden');
+                processSpinner.classList.add('hidden');
+            }
+        }
+
+        function displayExtractedData() {
+            const dataDisplay = document.getElementById('data-display');
+            const extractedDiv = document.getElementById('extracted-data');
+            
+            dataDisplay.innerHTML = `
+                <div class="mb-4">
+                    <h6 class="font-semibold text-gray-700 mb-2">Passport Information:</h6>
+                    <div class="text-sm space-y-1">
+                        <p><span class="font-medium">Name:</span> ${extractedData.passport.fullName}</p>
+                        <p><span class="font-medium">Passport #:</span> ${extractedData.passport.passportNumber}</p>
+                        <p><span class="font-medium">Nationality:</span> ${extractedData.passport.nationality}</p>
+                        <p><span class="font-medium">DOB:</span> ${extractedData.passport.dateOfBirth}</p>
+                    </div>
+                </div>
+                <div>
+                    <h6 class="font-semibold text-gray-700 mb-2">I-20 Information:</h6>
+                    <div class="text-sm space-y-1">
+                        <p><span class="font-medium">SEVIS ID:</span> ${extractedData.i20.sevisId}</p>
+                        <p><span class="font-medium">School:</span> ${extractedData.i20.schoolName}</p>
+                        <p><span class="font-medium">Program:</span> ${extractedData.i20.programOfStudy}</p>
+                        <p><span class="font-medium">Level:</span> ${extractedData.i20.academicLevel}</p>
+                    </div>
+                </div>
+            `;
+            extractedDiv.classList.remove('hidden');
+        }
+
+        function continueInterview() {
+            // Continue with the interview questions after document processing
+            currentIndex = 1; // Skip greeting since it's already done
+            speakNext();
+        }
 
         function updateTimestamp() {
             const now = new Date();
@@ -155,20 +422,32 @@
                 setLoadingState('start-btn', false);
                 return;
             }
+            
             const text = script[currentIndex];
             const utterance = new SpeechSynthesisUtterance(text);
             utterance.lang = 'en-US';
             utterance.voice = getVoiceForGender(gender);
+            
             utterance.onstart = () => {
                 image.classList.add('speaking');
             };
+            
             utterance.onend = () => {
                 image.classList.remove('speaking');
+                
+                // After greeting (first message), show document modal
+                if (currentIndex === 0) {
+                    showDocumentModal();
+                    return; // Don't continue to next question yet
+                }
+                
+                // For other questions, continue normally
                 startListening(() => {
                     currentIndex++;
                     speakNext();
                 });
             };
+            
             window.speechSynthesis.speak(utterance);
         }
 
@@ -212,6 +491,10 @@
             
             try {
                 setLoadingState('refresh-btn', true);
+                
+                // Show loading spinner for counter
+                document.getElementById('counter').innerHTML = '<div class="loading-spinner mx-auto"></div>';
+                
                 const response = await fetch('/get_applicant');
                 const data = await response.json();
                 
@@ -258,28 +541,31 @@
         }
 
         document.getElementById('start-btn').addEventListener('click', () => {
-            if (isInterviewActive) return;
+            if (isInterviewActive || isLoading) return;
             
             setLoadingState('start-btn', true);
             isInterviewActive = true;
             
-            // Fetch new data only if no interview is active
-            if (script.length === 0) {
-                fetchApplicantData(true).then(() => {
-                    setLoadingState('start-btn', false);
-                });
-            } else {
-                // Resume with existing data
-                if (window.speechSynthesis.getVoices().length === 0) {
-                    window.speechSynthesis.onvoiceschanged = () => {
+            // Always show spinner and process
+            setTimeout(() => {
+                // Fetch new data only if no interview is active
+                if (script.length === 0) {
+                    fetchApplicantData(true).then(() => {
+                        setLoadingState('start-btn', false);
+                    });
+                } else {
+                    // Resume with existing data
+                    if (window.speechSynthesis.getVoices().length === 0) {
+                        window.speechSynthesis.onvoiceschanged = () => {
+                            speakNext();
+                            setLoadingState('start-btn', false);
+                        };
+                    } else {
                         speakNext();
                         setLoadingState('start-btn', false);
-                    };
-                } else {
-                    speakNext();
-                    setLoadingState('start-btn', false);
+                    }
                 }
-            }
+            }, 100); // Small delay to ensure spinner shows
         });
 
         document.getElementById('refresh-btn').addEventListener('click', async () => {
@@ -300,11 +586,33 @@
         });
 
         window.onload = () => {
-            // Ensure all spinners are initially hidden
-            document.getElementById('start-btn-spinner').classList.add('hidden');
-            document.getElementById('refresh-btn-spinner').classList.add('hidden');
+            // Show loading state for start button initially
+            setLoadingState('start-btn', true);
             
-            fetchApplicantData(false); // Load initial data without starting interview
+            // Reset global variables
+            isLoading = false;
+            isInterviewActive = false;
+            documentsUploaded = { passport: false, i20: false };
+            extractedData = {};
+            
+            // Setup file upload handlers
+            setupFileUpload('passport-input', 'passport-drop-zone', 'passport-preview', 'passport');
+            setupFileUpload('i20-input', 'i20-drop-zone', 'i20-preview', 'i20');
+            
+            // Setup modal event listeners
+            document.getElementById('cancel-docs').addEventListener('click', () => {
+                hideDocumentModal();
+                // Reset interview state
+                isInterviewActive = false;
+                window.speechSynthesis.cancel();
+            });
+            
+            document.getElementById('process-docs').addEventListener('click', processDocuments);
+            
+            fetchApplicantData(false).then(() => {
+                // Hide start button loading after data is fetched
+                setLoadingState('start-btn', false);
+            }); // Load initial data without starting interview
             updateTimestamp();
         };
     </script>
